@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expenses - Expense Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding: 30px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+    .expense-table th, .expense-table td {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2 class="mb-4 text-center">Your Expenses</h2>
+
+  <!-- Expense Form -->
+  <form id="expense-form" class="mb-4">
+    <div class="row">
+      <div class="col-md-3">
+        <input type="text" id="title" class="form-control" placeholder="Title" required>
+      </div>
+      <div class="col-md-2">
+        <input type="number" id="amount" class="form-control" placeholder="Amount" required>
+      </div>
+      <div class="col-md-2">
+        <!-- Category dropdown with defaults -->
+        <select id="category" class="form-control" required>
+          <option value="">Select Category</option>
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Shopping">Shopping</option>
+          <option value="Bills">Bills</option>
+          <option value="Health">Health</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <input type="text" id="notes" class="form-control" placeholder="Notes">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Add</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Expense Table -->
+  <table class="table table-bordered expense-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Amount</th>
+        <th>Category</th>
+        <th>Date</th>
+        <th>Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="expense-table-body">
+      <!-- Expenses will be rendered here -->
+    </tbody>
+  </table>
+  <button onclick="goBack()" class="btn btn-secondary mt-3">⬅️ Back to Dashboard</button>
+</div>
+
+<script>
+  let selectedExpenseId = null;
+
+  function getAccessToken() {
+    return localStorage.getItem("access_token");
+  }
+
+  function getRefreshToken() {
+    return localStorage.getItem("refresh_token");
+  }
+
+  async function refreshAccessToken() {
+    const response = await fetch("/api/token/refresh/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh: getRefreshToken() })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem("access_token", data.access);
+      return data.access;
+    } else {
+      localStorage.clear();
+      window.location.href = "/login-page/";
+    }
+  }
+
+  async function fetchWithAuth(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers["Authorization"] = `Bearer ${getAccessToken()}`;
+
+    let response = await fetch(url, options);
+
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      options.headers["Authorization"] = `Bearer ${newToken}`;
+      response = await fetch(url, options);
+    }
+
+    return response;
+  }
+
+  const expenseTableBody = document.getElementById("expense-table-body");
+  const expenseForm = document.getElementById("expense-form");
+
+  function fetchExpenses() {
+    fetchWithAuth("/api/expenses/")
+      .then(res => res.json())
+      .then(data => {
+        expenseTableBody.innerHTML = "";
+        data.forEach(expense => {
+          const row = `
+            <tr>
+              <td>${expense.title}</td>
+              <td>${expense.amount}</td>
+              <td>${expense.category}</td>
+              <td>${expense.date}</td>
+              <td>${expense.notes || ""}</td>
+              <td>
+                <button onclick="editExpense(${expense.id}, '${expense.title}', ${expense.amount}, '${expense.category}', '${expense.notes || ""}')" class="btn btn-sm btn-warning me-1">Edit</button>
+                <button onclick="deleteExpense(${expense.id})" class="btn btn-sm btn-danger">Delete</button>
+              </td>
+            </tr>
+          `;
+          expenseTableBody.innerHTML += row;
+        });
+      });
+  }
+
+  function editExpense(id, title, amount, category, notes) {
+    document.getElementById("title").value = title;
+    document.getElementById("amount").value = amount;
+    document.getElementById("category").value = category;
+    document.getElementById("notes").value = notes;
+    selectedExpenseId = id;
+    document.querySelector("#expense-form button[type='submit']").innerText = "Update";
+  }
+
+  expenseForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    const data = {
+      title: document.getElementById("title").value,
+      amount: document.getElementById("amount").value,
+      category: document.getElementById("category").value,
+      notes: document.getElementById("notes").value
+    };
+
+    let url = "/api/expenses/";
+    let method = "POST";
+
+    if (selectedExpenseId) {
+      url += `${selectedExpenseId}/`;
+      method = "PUT";
+    }
+
+    fetchWithAuth(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(res => {
+      if (res.ok) {
+        fetchExpenses();
+        expenseForm.reset();
+        selectedExpenseId = null;
+        document.querySelector("#expense-form button[type='submit']").innerText = "Add";
+      } else {
+        alert("Failed to save expense.");
+      }
+    });
+  });
+
+  function deleteExpense(id) {
+    if (!confirm("Are you sure you want to delete this expense?")) return;
+
+    fetchWithAuth(`/api/expenses/${id}/`, { method: "DELETE" })
+      .then(res => {
+        if (res.ok) {
+          fetchExpenses();
+        } else {
+          alert("Failed to delete.");
+        }
+      });
+  }
+
+  function goBack() {
+    window.location.href = "/dashboard-page/";
+  }
+
+  if (!getAccessToken() || !getRefreshToken()) {
+    alert("You must be logged in.");
+    window.location.href = "/login-page/";
+  } else {
+    fetchExpenses();
+  }
+</script>
+
+</body>
+</html>
