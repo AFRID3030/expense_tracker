@@ -104,13 +104,18 @@ WSGI_APPLICATION = 'personal_expense_tracker.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=os.getenv("DATABASE_URL"),
+#         conn_max_age=600,
+#         ssl_require=True
+#     )
+# }
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True
-    )
+    'default': dj_database_url.config(default='sqlite:///db.sqlite3')
 }
+
 
 
 
@@ -165,9 +170,9 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'tracker/static')]"""
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
 
-import django_heroku
 
-django_heroku.settings(locals())
+
+
 
 
 # Default primary key field type
