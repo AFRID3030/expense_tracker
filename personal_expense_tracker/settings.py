@@ -11,6 +11,15 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 import os
 from pathlib import Path
+import dj_database_url
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+DATABASES = {
+    'default': dj_database_url.config(default=os.getenv('DATABASE_URL'))
+}
+
 #from personal_expense_tracker.personal_expense_tracker.settings import REST_FRAMEWORK
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -166,8 +175,8 @@ django_heroku.settings(locals())
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-import os
-import dj_database_url
-from dotenv import load_dotenv
 
-load_dotenv()
+
+
+
+
